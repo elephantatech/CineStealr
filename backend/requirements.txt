@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+ultralytics
+torch
+torchvision
+sqlalchemy
+python-multipart
+requests
+python-dotenv
+pillow

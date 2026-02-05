@@ -1,0 +1,53 @@
+services:
+  llm-init:
+    image: alpine:latest
+    container_name: cinestealr_llm_init
+    volumes:
+      - ./docker/models:/models
+    command: >
+      sh -c "
+        apk add --no-cache curl &&
+        if [ ! -f /models/llava-v1.5-7b-Q4_K.gguf ]; then
+          echo 'Downloading LLaVA Model...' &&
+          curl -L https://huggingface.co/mys/ggml_llava-v1.5-7b/resolve/main/ggml-model-q4_k.gguf -o /models/llava-v1.5-7b-Q4_K.gguf;
+        fi &&
+        if [ ! -f /models/mmproj-model-f16.gguf ]; then
+          echo 'Downloading LLaVA Projector...' &&
+          curl -L https://huggingface.co/mys/ggml_llava-v1.5-7b/resolve/main/mmproj-model-f16.gguf -o /models/mmproj-model-f16.gguf;
+        fi
+      "
+
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: cinestealr_llm
+    depends_on:
+      llm-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/models:/models
+    command: -m /models/llava-v1.5-7b-Q4_K.gguf --mmproj /models/mmproj-model-f16.gguf --host 0.0.0.0 --port 8080
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: cinestealr_backend
+    depends_on:
+      - llm
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_API_URL=http://llm:8080/v1/chat/completions
+    volumes:
+      - ./backend/uploads:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: cinestealr_frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
