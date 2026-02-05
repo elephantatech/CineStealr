@@ -452,8 +452,8 @@ function DetailPage() {
                   <button
                     onClick={copyToClipboard}
                     className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-all ${copied
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600'
+                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600'
                       }`}
                   >
                     {copied ? <><Check size={12} /> Copied!</> : <><Copy size={12} /> Copy</>}
@@ -486,16 +486,50 @@ function DetailPage() {
   );
 }
 
+function Footer() {
+  return (
+    <footer className="bg-slate-800 border-t border-slate-700 mt-auto">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2 text-slate-400">
+            <Clapperboard className="text-blue-500" size={20} />
+            <span className="font-semibold text-white">CineStealr</span>
+            <span className="text-sm">• AI Scene Description & Prompt Generator</span>
+          </div>
+          <div className="flex items-center gap-6 text-sm text-slate-400">
+            <span>Powered by LLaVA & YOLO</span>
+            <a
+              href="https://github.com/elephantatech/cinestealr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-blue-400 transition-colors"
+            >
+              GitHub
+            </a>
+            <span>Apache 2.0 License</span>
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-slate-700 text-center text-xs text-slate-500">
+          © 2026 CineStealr Contributors. All rights reserved.
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-900 text-slate-100 font-sans">
+      <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col">
         <Navbar />
-        <Routes>
-          <Route path="/" element={<UploadPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/details/:id" element={<DetailPage />} />
-        </Routes>
+        <main className="flex-grow">
+          <Routes>
+            <Route path="/" element={<UploadPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/details/:id" element={<DetailPage />} />
+          </Routes>
+        </main>
+        <Footer />
       </div>
     </BrowserRouter>
   );

@@ -10,6 +10,17 @@ Local AI application for generating cinematic scene descriptions and image promp
 - 📋 **Copy to Clipboard** - One-click copy for generated prompts
 - 📜 **History** - Browse and revisit previous analyses
 
+## Screenshots
+
+### Upload Page
+![Upload Page](docs/screenshots/home.png)
+
+### Analysis History
+![History Page](docs/screenshots/history.png)
+
+### Scene Analysis & Prompt Generation
+![Detail Page](docs/screenshots/detail.png)
+
 ## Quick Start
 
 ### macOS (Apple Silicon) - Recommended
