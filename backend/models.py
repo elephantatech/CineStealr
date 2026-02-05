@@ -13,3 +13,9 @@ class ImageRecord(Base):
     description = Column(Text)
     image_prompt = Column(Text)  # AI-friendly prompt for image generation
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Settings(Base):
+    __tablename__ = "settings"
+    
+    key = Column(String, primary_key=True, index=True)
+    value = Column(String)

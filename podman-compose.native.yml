@@ -13,9 +13,13 @@ services:
       - "8000:8000"
     environment:
       # Connect to native LLM running on host with Metal GPU
-      - LLM_API_URL=http://host.containers.internal:8080/v1/chat/completions
+      # - INIT_LLM_PROVIDER=local # Options: openai, ollama, llama_cpp, local
+      # - INIT_LLM_API_KEY=sk-...
+      # - INIT_LLM_MODEL=gpt-4-vision-preview
+      - INIT_LLM_URL=http://host.containers.internal:8080/v1/chat/completions # Explicit override
     volumes:
       - ./backend/uploads:/app/uploads
+      - ./backend/data:/app/data
     restart: unless-stopped
 
   frontend:

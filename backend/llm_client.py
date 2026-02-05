@@ -32,7 +32,7 @@ class LLMService:
             logger.error(f"Error encoding image {image_path}: {e}")
             raise
 
-    def generate_description_stream(self, image_path, media_type="image"):
+    async def generate_description_stream(self, image_path, media_type="image", api_url=None, api_key=None, model_name=None):
         try:
             base64_image = self.encode_image(image_path)
         except Exception as e:
@@ -53,6 +53,9 @@ class LLMService:
             )
             system_role = "You are a helpful assistant."
 
+        # Use provided model name or fallback to default
+        target_model = model_name or "llava-v1.5-7b-Q4_K_M.gguf"
+
         payload = {
             "messages": [
                 {
@@ -70,23 +73,33 @@ class LLMService:
             ],
             "temperature": 0.5, 
             "max_tokens": 300, 
-            "stream": True
+            "stream": True,
+            "model": target_model
         }
 
         # Retry logic for 503 (Model Loading) errors
         max_retries = 10
         retry_delay = 5
+        target_url = api_url or LLM_API_URL
+        
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
 
         for attempt in range(max_retries):
             try:
-                logger.info(f"Starting LLaVA stream for image: {image_path} (Attempt {attempt + 1})")
-                with requests.post(LLM_API_URL, json=payload, stream=True, timeout=300) as response:
+                logger.info(f"Starting LLaVA stream for image: {image_path} (Attempt {attempt + 1}) using {target_url}")
+                with requests.post(target_url, json=payload, headers=headers, stream=True, timeout=300) as response:
                     if response.status_code == 503:
                         logger.warning("LLM Service Unavailable, retrying...")
                         time.sleep(retry_delay)
                         continue
                     
-                    response.raise_for_status()
+                    if response.status_code != 200:
+                         logger.error(f"LLM API Error: {response.status_code} - {response.text}")
+                         yield f"[Error: LLM API returned {response.status_code}]"
+                         return
+
                     for line in response.iter_lines():
                         if line:
                             line = line.decode('utf-8')
@@ -97,9 +110,10 @@ class LLMService:
                                 try:
                                     data = json.loads(data_str)
                                     # LLaVA/llama.cpp might return content in different fields sometimes, but usually standard
-                                    delta = data['choices'][0]['delta']
-                                    if 'content' in delta and delta['content']:
-                                        yield delta['content']
+                                    if 'choices' in data and len(data['choices']) > 0:
+                                        delta = data['choices'][0].get('delta', {})
+                                        if 'content' in delta and delta['content']:
+                                            yield delta['content']
                                 except json.JSONDecodeError:
                                     continue
                 return 
@@ -113,7 +127,7 @@ class LLMService:
                 yield f"\n[Error: {e}]"
                 break
 
-    def generate_image_prompt_stream(self, description: str, tags: str):
+    def generate_image_prompt_stream(self, description: str, tags: str, api_url=None, api_key=None, model_name=None):
         """Generate an image generation prompt from a scene description."""
         
         prompt_text = f"""Based on this scene description and detected elements, create an image generation prompt.
@@ -132,6 +146,8 @@ Detected Elements: {tags}
 
 Generate a concise, detailed prompt (under 200 words) that would recreate this image style. Output ONLY the prompt, no explanations."""
 
+        target_model = model_name or "llava-v1.5-7b-Q4_K_M.gguf"
+
         payload = {
             "messages": [
                 {
@@ -145,13 +161,23 @@ Generate a concise, detailed prompt (under 200 words) that would recreate this i
             ],
             "temperature": 0.7,
             "max_tokens": 400,
-            "stream": True
+            "stream": True,
+            "model": target_model
         }
 
+        target_url = api_url or LLM_API_URL
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
         try:
-            logger.info("Starting image prompt generation from description")
-            with requests.post(LLM_API_URL, json=payload, stream=True, timeout=120) as response:
-                response.raise_for_status()
+            logger.info(f"Starting image prompt generation from description using {target_url}")
+            with requests.post(target_url, json=payload, headers=headers, stream=True, timeout=120) as response:
+                if response.status_code != 200:
+                     logger.error(f"LLM API Error: {response.status_code} - {response.text}")
+                     yield f"[Error: LLM API returned {response.status_code}]"
+                     return
+
                 for line in response.iter_lines():
                     if line:
                         line = line.decode('utf-8')
@@ -161,9 +187,10 @@ Generate a concise, detailed prompt (under 200 words) that would recreate this i
                                 break
                             try:
                                 data = json.loads(data_str)
-                                delta = data['choices'][0]['delta']
-                                if 'content' in delta and delta['content']:
-                                    yield delta['content']
+                                if 'choices' in data and len(data['choices']) > 0:
+                                    delta = data['choices'][0].get('delta', {})
+                                    if 'content' in delta and delta['content']:
+                                        yield delta['content']
                             except json.JSONDecodeError:
                                 continue
         except requests.exceptions.RequestException as e:
@@ -172,3 +199,30 @@ Generate a concise, detailed prompt (under 200 words) that would recreate this i
         except Exception as e:
             logger.error(f"Unexpected error in prompt generation: {e}")
             yield f"[Error: {e}]"
+
+    def get_models(self, api_url=None, api_key=None):
+        """Fetch available models from the LLM provider."""
+        target_url = api_url or LLM_API_URL
+        # Remove /chat/completions suffix if present to get base URL, then add /models
+        base_url = target_url.replace("/v1/chat/completions", "").replace("/chat/completions", "")
+        models_url = f"{base_url}/v1/models"
+        
+        # If the URL doesn't look like a standard OpenAI path, try just appending /models depending on provider
+        # But standard OpenAI is GET /v1/models
+        
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            
+        try:
+            logger.info(f"Fetching models from {models_url}")
+            response = requests.get(models_url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("data", []) # OpenAI format: {"data": [{"id": "model-id", ...}]}
+            else:
+                logger.error(f"Failed to fetch models: {response.status_code} - {response.text}")
+                return []
+        except Exception as e:
+            logger.error(f"Error fetching models: {e}")
+            return []

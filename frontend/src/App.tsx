@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Image as ImageIcon, Loader2, Send, History, ArrowLeft, Eye, Clapperboard, Film, Sparkles, Copy, Check } from 'lucide-react';
+import { Upload, Image as ImageIcon, Loader2, Send, History, ArrowLeft, Eye, Clapperboard, Film, Sparkles, Copy, Check, Settings, Trash2 } from 'lucide-react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
+import SettingsPage from './SettingsPage';
 
 interface ImageRecord {
   id: number;
@@ -31,6 +32,9 @@ function Navbar() {
           <Link to="/history" className="text-slate-300 hover:text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2">
             <History size={18} /> History
           </Link>
+          <Link to="/settings" className="text-slate-300 hover:text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2">
+            <Settings size={18} /> Settings
+          </Link>
         </nav>
       </div>
     </header>
@@ -40,17 +44,42 @@ function Navbar() {
 function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [mediaType, setMediaType] = useState<'image' | 'movie'>('image');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const navigate = useNavigate();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      setPreview(URL.createObjectURL(selectedFile));
-      setError(null);
+      processFile(e.target.files[0]);
+    }
+  };
+
+  const processFile = (selectedFile: File) => {
+    if (!selectedFile.type.startsWith('image/')) {
+      setError('Only image files are supported.');
+      return;
+    }
+    setFile(selectedFile);
+    setPreview(URL.createObjectURL(selectedFile));
+    setError(null);
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -61,7 +90,7 @@ function UploadPage() {
     setError(null);
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('media_type', mediaType);
+    formData.append('media_type', 'image');
 
     try {
       const response = await axios.post(`${API_BASE_URL}/upload`, formData);
@@ -80,41 +109,32 @@ function UploadPage() {
         </h2>
 
         <div className="flex flex-col gap-6">
-          <label className="relative group cursor-pointer">
-            <div className={`aspect-video w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${preview ? 'border-blue-500/50' : 'border-slate-600 hover:border-blue-500/50 bg-slate-900/50'}`}>
+          <label
+            className="relative group cursor-pointer"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <div className={`aspect-video w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${isDragging
+              ? 'border-blue-500 bg-slate-900/80 scale-[1.02]'
+              : preview
+                ? 'border-blue-500/50'
+                : 'border-slate-600 hover:border-blue-500/50 bg-slate-900/50'
+              }`}>
               {preview ? (
                 <img src={preview} alt="Preview" className="w-full h-full object-contain rounded-lg" />
               ) : (
                 <>
-                  <ImageIcon className="text-slate-500 group-hover:text-blue-400 mb-4" size={64} />
-                  <p className="text-slate-400 text-lg font-medium group-hover:text-slate-200">Click to select an image</p>
+                  <ImageIcon className={`mb-4 transition-colors ${isDragging ? 'text-blue-400' : 'text-slate-500 group-hover:text-blue-400'}`} size={64} />
+                  <p className={`text-lg font-medium transition-colors ${isDragging ? 'text-blue-300' : 'text-slate-400 group-hover:text-slate-200'}`}>
+                    {isDragging ? "Drop image here" : "Click or drag to upload image"}
+                  </p>
                   <p className="text-slate-500 text-sm mt-2">JPG, PNG supported</p>
                 </>
               )}
             </div>
             <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
           </label>
-
-          <div className="flex gap-4">
-            <button
-              onClick={() => setMediaType('image')}
-              className={`flex-1 py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${mediaType === 'image'
-                ? 'bg-blue-600 border-blue-500 text-white'
-                : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-                }`}
-            >
-              <ImageIcon size={18} /> Image Analysis
-            </button>
-            <button
-              onClick={() => setMediaType('movie')}
-              className={`flex-1 py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${mediaType === 'movie'
-                ? 'bg-purple-600 border-purple-500 text-white'
-                : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-                }`}
-            >
-              <Clapperboard size={18} /> Movie Scene
-            </button>
-          </div>
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg text-sm">
@@ -127,9 +147,7 @@ function UploadPage() {
             disabled={!file || loading}
             className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98] ${loading || !file
               ? 'bg-slate-700 cursor-not-allowed text-slate-400'
-              : mediaType === 'image'
-                ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20'
-                : 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20'
+              : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20'
               }`}
           >
             {loading ? (
@@ -152,6 +170,8 @@ function HistoryPage() {
   const [records, setRecords] = useState<ImageRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
   useEffect(() => {
     fetchRecords();
   }, []);
@@ -167,6 +187,25 @@ function HistoryPage() {
     }
   };
 
+  const verifyDelete = (e: React.MouseEvent, id: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirmId === null) return;
+
+    try {
+      await axios.delete(`${API_BASE_URL}/record/${deleteConfirmId}`);
+      setRecords(records.filter(r => r.id !== deleteConfirmId));
+      setDeleteConfirmId(null);
+    } catch (err) {
+      console.error('Failed to delete record', err);
+      alert('Failed to delete record');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center mt-20">
@@ -176,21 +215,51 @@ function HistoryPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto mt-8 px-4">
-      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-        <History className="text-blue-500" /> Analysis History
-      </h2>
+    <div className="max-w-6xl mx-auto mt-8 px-4 relative">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <History className="text-blue-500" /> Analysis History
+        </h2>
+      </div>
+
+      {/* Single Record Delete Confirmation Modal */}
+      {deleteConfirmId !== null && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 p-6 rounded-2xl max-w-md w-full border border-slate-700 shadow-2xl">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-2">
+              <Trash2 className="text-red-500" /> Delete Analysis?
+            </h3>
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to delete this analysis record? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {records.map((record) => (
-          <Link key={record.id} to={`/details/${record.id}`} className="group bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-900/10 transition-all block">
-            <div className="aspect-video bg-slate-900 relative overflow-hidden">
+          <div key={record.id} className="group relative bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-900/10 transition-all flex flex-col">
+            <Link to={`/details/${record.id}`} className="block aspect-video bg-slate-900 relative overflow-hidden">
               <img
                 src={`${API_BASE_URL}${record.file_path}`}
                 alt={record.filename}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
-              <div className="absolute top-2 right-2">
+              <div className="absolute top-2 right-2 flex gap-2">
                 {record.media_type === 'movie' ? (
                   <span className="bg-purple-600/90 text-white text-[10px] px-2 py-1 rounded-md flex items-center gap-1 shadow-sm backdrop-blur-sm">
                     <Film size={12} /> MOVIE
@@ -206,28 +275,38 @@ function HistoryPage() {
                   <Eye size={16} /> View Details
                 </span>
               </div>
-            </div>
-            <div className="p-4">
+            </Link>
+
+            <div className="p-4 flex-grow flex flex-col">
               <div className="flex justify-between items-start mb-2">
                 <p className="text-xs text-slate-500">{new Date(record.created_at).toLocaleString()}</p>
+                <button
+                  onClick={(e) => verifyDelete(e, record.id)}
+                  className="text-slate-500 hover:text-red-400 p-1 rounded-md hover:bg-slate-700 transition-colors"
+                  title="Delete Record"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
-              <p className="text-sm text-slate-300 line-clamp-2 mb-3 h-10">
-                {record.description || <span className="text-slate-500 italic">No description generated</span>}
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {record.tags.split(',').slice(0, 3).map((tag, i) => (
-                  <span key={i} className="text-[10px] px-2 py-0.5 bg-slate-700 text-slate-300 rounded-md">
-                    {tag}
-                  </span>
-                ))}
-                {record.tags.split(',').length > 3 && (
-                  <span className="text-[10px] px-2 py-0.5 bg-slate-700 text-slate-400 rounded-md">
-                    +{record.tags.split(',').length - 3}
-                  </span>
-                )}
-              </div>
+              <Link to={`/details/${record.id}`} className="block flex-grow">
+                <p className="text-sm text-slate-300 line-clamp-2 mb-3 h-10">
+                  {record.description || <span className="text-slate-500 italic">No description generated</span>}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {record.tags.split(',').slice(0, 3).map((tag, i) => (
+                    <span key={i} className="text-[10px] px-2 py-0.5 bg-slate-700 text-slate-300 rounded-md">
+                      {tag}
+                    </span>
+                  ))}
+                  {record.tags.split(',').length > 3 && (
+                    <span className="text-[10px] px-2 py-0.5 bg-slate-700 text-slate-400 rounded-md">
+                      +{record.tags.split(',').length - 3}
+                    </span>
+                  )}
+                </div>
+              </Link>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
 
@@ -243,7 +322,9 @@ function HistoryPage() {
 
 function DetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [record, setRecord] = useState<ImageRecord | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [description, setDescription] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
@@ -338,6 +419,17 @@ function DetailPage() {
     }
   };
 
+  const deleteRecord = async () => {
+    if (!id) return;
+    try {
+      await axios.delete(`${API_BASE_URL}/record/${id}`);
+      navigate('/history');
+    } catch (err) {
+      console.error('Failed to delete record', err);
+      alert('Failed to delete record');
+    }
+  };
+
   if (!record) {
     return (
       <div className="flex justify-center mt-20">
@@ -352,11 +444,20 @@ function DetailPage() {
         <Link to="/history" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
           <ArrowLeft size={18} /> Back to History
         </Link>
-        {record.media_type === 'movie' && (
-          <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-2">
-            <Clapperboard size={14} /> Movie Scene Context
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {record.media_type === 'movie' && (
+            <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-2">
+              <Clapperboard size={14} /> Movie Scene Context
+            </span>
+          )}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="text-slate-400 hover:text-red-400 p-2 hover:bg-slate-800 rounded-lg transition-colors"
+            title="Delete Analysis"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -482,6 +583,34 @@ function DetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 p-6 rounded-2xl max-w-md w-full border border-slate-700 shadow-2xl">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-2">
+              <Trash2 className="text-red-500" /> Delete Analysis?
+            </h3>
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to delete this analysis record? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteRecord}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -527,6 +656,7 @@ function App() {
             <Route path="/" element={<UploadPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/details/:id" element={<DetailPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
         <Footer />

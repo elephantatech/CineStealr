@@ -203,17 +203,21 @@ show_help() {
     echo "  help        Show this help message"
     echo ""
     echo "Options:"
-    echo "  --native    Use native LLM with Metal GPU (macOS only, default on macOS)"
-    echo "  --container Use containerized LLM (CPU only, default on Linux)"
-    echo "  --docker    Use Docker instead of Podman"
-    echo "  --podman    Use Podman (default)"
+    echo "  --native     Use native LLM with Metal GPU (macOS only, default on macOS)"
+    echo "  --container  Use containerized LLM (CPU only, default on Linux)"
+    echo "  --provider   Set LLM provider (openai, ollama, local)"
+    echo "  --key        Set API Key for the provider"
+    echo "  --url        Override LLM URL"
+    echo "  --docker     Use Docker instead of Podman"
+    echo "  --podman     Use Podman (default)"
     echo ""
     echo "Examples:"
-    echo "  $0 setup              # First-time setup"
-    echo "  $0 start              # Start with auto-detected best mode"
-    echo "  $0 start --native     # Force native mode (Metal GPU)"
-    echo "  $0 start --container  # Force container mode (CPU)"
-    echo "  $0 stop               # Stop all services"
+    echo "  $0 setup                                            # First-time setup"
+    echo "  $0 start                                            # Start (auto-detect)"
+    echo "  $0 start --provider openai --key sk-...             # Start with OpenAI"
+    echo "  $0 start --provider ollama                          # Start with local Ollama"
+    echo "  $0 start --native                                   # Force native mode"
+    echo "  $0 stop                                             # Stop all services"
 }
 
 # Parse arguments
@@ -224,6 +228,18 @@ FORCE_DOCKER=""
 shift || true
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --provider)
+            export INIT_LLM_PROVIDER="$2"
+            shift 2
+            ;;
+        --key)
+            export INIT_LLM_API_KEY="$2"
+            shift 2
+            ;;
+        --url)
+            export INIT_LLM_URL="$2"
+            shift 2
+            ;;            
         --native)
             MODE="native"
             shift
