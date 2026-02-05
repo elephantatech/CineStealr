@@ -1,0 +1,28 @@
+# CineStealr - Podman Compose for Native LLM Mode
+# Use this when running LLM natively with Metal GPU (./start_llm.sh)
+#
+# Usage:
+#   1. Start native LLM: ./start_llm.sh
+#   2. Start backend/frontend: podman compose -f podman-compose.native.yml up -d
+
+services:
+  backend:
+    build: ./backend
+    container_name: cinestealr_backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Connect to native LLM running on host with Metal GPU
+      - LLM_API_URL=http://host.containers.internal:8080/v1/chat/completions
+    volumes:
+      - ./backend/uploads:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: cinestealr_frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    restart: unless-stopped

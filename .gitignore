@@ -166,3 +166,9 @@ backend/uploads/
 docker/models/
 .agents/
 *.pt
+*.pid
+get-pip.py
+*.db
+*.sqlite
+*.gguf.bak
+*.gguf.old

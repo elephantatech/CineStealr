@@ -108,6 +108,35 @@ def get_record(record_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Record not found")
     return record
 
+@app.get("/generate-prompt/{record_id}")
+async def generate_image_prompt(record_id: int, db: Session = Depends(get_db)):
+    """Generate an AI image generation prompt from the scene description."""
+    record = db.query(models.ImageRecord).filter(models.ImageRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    if not record.description:
+        raise HTTPException(status_code=400, detail="No description available. Generate description first.")
+    
+    async def event_generator():
+        full_prompt = ""
+        try:
+            for chunk in llm_service.generate_image_prompt_stream(record.description, record.tags):
+                if chunk:
+                    full_prompt += chunk
+                    yield f"data: {chunk}\n\n"
+            
+            # Save final prompt to DB
+            record.image_prompt = full_prompt.strip()
+            db.commit()
+            yield "data: [DONE]\n\n"
+            
+        except Exception as e:
+            logger.error(f"Prompt generation failed: {e}")
+            yield f"data: [ERROR] {str(e)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}

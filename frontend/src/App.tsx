@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Image as ImageIcon, Loader2, Send, History, ArrowLeft, Eye, Clapperboard, Film } from 'lucide-react';
+import { Upload, Image as ImageIcon, Loader2, Send, History, ArrowLeft, Eye, Clapperboard, Film, Sparkles, Copy, Check } from 'lucide-react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 
 interface ImageRecord {
@@ -10,6 +10,7 @@ interface ImageRecord {
   media_type: 'image' | 'movie';
   tags: string;
   description: string;
+  image_prompt: string | null;
   created_at: string;
 }
 
@@ -77,7 +78,7 @@ function UploadPage() {
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
           <Upload className="text-blue-500" /> Upload Scene
         </h2>
-        
+
         <div className="flex flex-col gap-6">
           <label className="relative group cursor-pointer">
             <div className={`aspect-video w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${preview ? 'border-blue-500/50' : 'border-slate-600 hover:border-blue-500/50 bg-slate-900/50'}`}>
@@ -97,21 +98,19 @@ function UploadPage() {
           <div className="flex gap-4">
             <button
               onClick={() => setMediaType('image')}
-              className={`flex-1 py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${
-                mediaType === 'image' 
-                  ? 'bg-blue-600 border-blue-500 text-white' 
-                  : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-              }`}
+              className={`flex-1 py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${mediaType === 'image'
+                ? 'bg-blue-600 border-blue-500 text-white'
+                : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                }`}
             >
               <ImageIcon size={18} /> Image Analysis
             </button>
             <button
               onClick={() => setMediaType('movie')}
-              className={`flex-1 py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${
-                mediaType === 'movie' 
-                  ? 'bg-purple-600 border-purple-500 text-white' 
-                  : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-              }`}
+              className={`flex-1 py-3 px-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${mediaType === 'movie'
+                ? 'bg-purple-600 border-purple-500 text-white'
+                : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                }`}
             >
               <Clapperboard size={18} /> Movie Scene
             </button>
@@ -126,13 +125,12 @@ function UploadPage() {
           <button
             onClick={handleUpload}
             disabled={!file || loading}
-            className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98] ${
-              loading || !file 
-                ? 'bg-slate-700 cursor-not-allowed text-slate-400'
-                : mediaType === 'image' 
-                  ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20' 
-                  : 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20'
-            }`}
+            className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98] ${loading || !file
+              ? 'bg-slate-700 cursor-not-allowed text-slate-400'
+              : mediaType === 'image'
+                ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20'
+                : 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/20'
+              }`}
           >
             {loading ? (
               <>
@@ -182,14 +180,14 @@ function HistoryPage() {
       <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
         <History className="text-blue-500" /> Analysis History
       </h2>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {records.map((record) => (
           <Link key={record.id} to={`/details/${record.id}`} className="group bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-900/10 transition-all block">
             <div className="aspect-video bg-slate-900 relative overflow-hidden">
-              <img 
-                src={`${API_BASE_URL}${record.file_path}`} 
-                alt={record.filename} 
+              <img
+                src={`${API_BASE_URL}${record.file_path}`}
+                alt={record.filename}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
               <div className="absolute top-2 right-2">
@@ -232,7 +230,7 @@ function HistoryPage() {
           </Link>
         ))}
       </div>
-      
+
       {records.length === 0 && (
         <div className="text-center py-20 bg-slate-800/50 rounded-2xl border border-dashed border-slate-700">
           <p className="text-slate-500 text-lg">No analysis history found.</p>
@@ -248,13 +246,20 @@ function DetailPage() {
   const [record, setRecord] = useState<ImageRecord | null>(null);
   const [description, setDescription] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [promptStreaming, setPromptStreaming] = useState(false);
+  const [copied, setCopied] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const promptEventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     fetchRecord();
     return () => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
+      }
+      if (promptEventSourceRef.current) {
+        promptEventSourceRef.current.close();
       }
     };
   }, [id]);
@@ -267,6 +272,9 @@ function DetailPage() {
         setDescription(response.data.description);
       } else {
         startStreaming();
+      }
+      if (response.data.image_prompt) {
+        setImagePrompt(response.data.image_prompt);
       }
     } catch (err) {
       console.error('Failed to fetch record', err);
@@ -294,6 +302,42 @@ function DetailPage() {
     };
   };
 
+  const startPromptGeneration = () => {
+    setPromptStreaming(true);
+    setImagePrompt("");
+    const eventSource = new EventSource(`${API_BASE_URL}/generate-prompt/${id}`);
+    promptEventSourceRef.current = eventSource;
+
+    eventSource.onmessage = (event) => {
+      if (event.data === "[DONE]") {
+        eventSource.close();
+        setPromptStreaming(false);
+      } else if (event.data.startsWith("[ERROR]")) {
+        console.error("Prompt generation error:", event.data);
+        eventSource.close();
+        setPromptStreaming(false);
+      } else {
+        setImagePrompt((prev) => prev + event.data);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error("Prompt EventSource failed:", err);
+      eventSource.close();
+      setPromptStreaming(false);
+    };
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(imagePrompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
   if (!record) {
     return (
       <div className="flex justify-center mt-20">
@@ -317,9 +361,9 @@ function DetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-slate-800 p-2 rounded-2xl shadow-xl border border-slate-700 h-fit">
-          <img 
-            src={`${API_BASE_URL}${record.file_path}`} 
-            alt={record.filename} 
+          <img
+            src={`${API_BASE_URL}${record.file_path}`}
+            alt={record.filename}
             className="w-full rounded-xl"
           />
         </div>
@@ -347,7 +391,7 @@ function DetailPage() {
                     <span className="flex items-center gap-2 text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded-full animate-pulse">
                       <Loader2 size={12} className="animate-spin" /> Generating...
                     </span>
-                    <button 
+                    <button
                       onClick={() => {
                         if (eventSourceRef.current) {
                           eventSourceRef.current.close();
@@ -362,13 +406,79 @@ function DetailPage() {
                 )}
               </div>
             </div>
-            
+
             <div className="prose prose-invert max-w-none">
               <p className="text-slate-300 leading-relaxed text-lg whitespace-pre-wrap font-serif">
                 {description}
                 {streaming && <span className="inline-block w-2 h-4 bg-blue-500 ml-1 animate-pulse"></span>}
               </p>
             </div>
+          </div>
+
+          {/* Image Generation Prompt Card */}
+          <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                <Sparkles size={16} /> Image Generation Prompt
+              </h3>
+              <div className="flex items-center gap-2">
+                {!promptStreaming && !streaming && description && !imagePrompt && (
+                  <button
+                    onClick={startPromptGeneration}
+                    className="flex items-center gap-2 text-sm bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-lg hover:bg-amber-500/30 transition-colors"
+                  >
+                    <Sparkles size={14} /> Generate Prompt
+                  </button>
+                )}
+                {promptStreaming && (
+                  <>
+                    <span className="flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full animate-pulse">
+                      <Loader2 size={12} className="animate-spin" /> Generating...
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (promptEventSourceRef.current) {
+                          promptEventSourceRef.current.close();
+                          setPromptStreaming(false);
+                        }
+                      }}
+                      className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-1 rounded-md hover:bg-red-500/30 transition-colors"
+                    >
+                      Stop
+                    </button>
+                  </>
+                )}
+                {imagePrompt && !promptStreaming && (
+                  <button
+                    onClick={copyToClipboard}
+                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-all ${copied
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600'
+                      }`}
+                  >
+                    {copied ? <><Check size={12} /> Copied!</> : <><Copy size={12} /> Copy</>}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {imagePrompt ? (
+              <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                <p className="text-slate-200 leading-relaxed font-mono text-sm whitespace-pre-wrap">
+                  {imagePrompt}
+                  {promptStreaming && <span className="inline-block w-2 h-4 bg-amber-500 ml-1 animate-pulse"></span>}
+                </p>
+              </div>
+            ) : (
+              <div className="text-slate-500 text-sm italic">
+                {streaming
+                  ? "Complete description first, then generate an image prompt..."
+                  : description
+                    ? "Click 'Generate Prompt' to create an AI image generation prompt from this scene."
+                    : "Generate a description first to create an image prompt."
+                }
+              </div>
+            )}
           </div>
         </div>
       </div>
