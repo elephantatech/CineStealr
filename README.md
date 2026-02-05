@@ -18,8 +18,14 @@ Local AI application for generating cinematic scene descriptions and image promp
 ### Analysis History
 ![History Page](docs/screenshots/history.png)
 
+### Real-Time Streaming Analysis
+![Streaming Analysis](docs/screenshots/streaming.png)
+
 ### Scene Analysis & Prompt Generation
 ![Detail Page](docs/screenshots/detail.png)
+
+### Generated AI Prompt
+![Prompt Detail](docs/screenshots/prompt.png)
 
 ## Quick Start
 
